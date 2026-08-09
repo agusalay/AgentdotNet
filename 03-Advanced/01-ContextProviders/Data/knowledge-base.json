@@ -1,0 +1,29 @@
+{
+  "facts": [
+    {
+      "topic": "Microsoft Agent Framework",
+      "content": "Microsoft Agent Framework adalah SDK unified dari Microsoft untuk membangun AI agents. Framework ini merupakan penggabungan dari Semantic Kernel dan AutoGen, dirilis secara GA pada April 2025 untuk .NET dan Python.",
+      "source": "Microsoft Learn Documentation"
+    },
+    {
+      "topic": "Context Provider",
+      "content": "Context Provider adalah komponen yang menyediakan informasi tambahan (memory, data eksternal, conversation history) kepada agent sebelum agent memproses request. Context Provider memungkinkan agent memiliki 'ingatan' dan akses ke knowledge base.",
+      "source": "Microsoft Agent Framework Architecture Guide"
+    },
+    {
+      "topic": "Token Limit",
+      "content": "Setiap model LLM memiliki batas context window yang diukur dalam token. GPT-4o-mini memiliki context window 128K tokens. Manajemen token yang baik mencegah error context overflow dan mengoptimalkan biaya API call.",
+      "source": "Azure OpenAI Documentation"
+    },
+    {
+      "topic": "Sliding Window Strategy",
+      "content": "Sliding window adalah strategi context management yang menyimpan N percakapan terakhir dan menghapus yang lebih lama. Strategi ini sederhana namun efektif untuk menjaga relevansi konteks tanpa melebihi token limit.",
+      "source": "AI Memory Management Best Practices"
+    },
+    {
+      "topic": "RAG Pattern",
+      "content": "Retrieval-Augmented Generation (RAG) adalah pola arsitektur yang menggabungkan pencarian informasi dari knowledge base dengan generasi teks oleh LLM. RAG memungkinkan agent menjawab pertanyaan berdasarkan data spesifik tanpa fine-tuning model.",
+      "source": "Microsoft AI Architecture Center"
+    }
+  ]
+}

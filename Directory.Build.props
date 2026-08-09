@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+  </PropertyGroup>
+
+  <!-- 
+    Shared appsettings.json di root solution.
+    Set endpoint Azure OpenAI sekali di file ini, otomatis dibaca semua project.
+    File lokal appsettings.json (di folder module) tetap menang jika ada (karena loaded kedua oleh ConfigurationBuilder).
+  -->
+  <ItemGroup Condition="'$(IsTestProject)' != 'true'">
+    <None Include="$(MSBuildThisFileDirectory)appsettings.json"
+          Link="appsettings.json"
+          CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('$(MSBuildThisFileDirectory)appsettings.json')" />
+  </ItemGroup>
+</Project>
