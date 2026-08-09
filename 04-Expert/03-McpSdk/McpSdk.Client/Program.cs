@@ -25,10 +25,18 @@ try
     // Konfigurasi transport — menjalankan MCP Server sebagai child process.
     // StdioClientTransport akan spawn process `dotnet run` yang menjalankan server,
     // kemudian berkomunikasi melalui stdin/stdout menggunakan JSON-RPC 2.0.
+    // Path ke server project dihitung relatif dari lokasi file source ini,
+    // sehingga dapat dijalankan dari directory manapun.
+    var clientDir = Path.GetDirectoryName(typeof(Program).Assembly.Location)
+        ?? AppContext.BaseDirectory;
+    // Naik dari bin/Debug/net9.0 ke McpSdk.Client/, lalu ke ../McpSdk.Server/
+    var serverProjectPath = Path.GetFullPath(
+        Path.Combine(clientDir, "..", "..", "..", "..", "McpSdk.Server", "McpSdk.Server.csproj"));
+
     var transport = new StdioClientTransport(new()
     {
         Command = "dotnet",
-        Arguments = ["run", "--project", "../McpSdk.Server/McpSdk.Server.csproj"],
+        Arguments = ["run", "--project", serverProjectPath],
         Name = "Weather MCP Server"
     });
 
@@ -89,7 +97,7 @@ try
     try
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
-        var toolName = "GetCurrentWeather";
+        var toolName = "get_current_weather";
         var parameters = new Dictionary<string, object?> { { "city", "Jakarta" } };
 
         Console.WriteLine($"  [{timestamp}] Memanggil tool: {toolName}");
@@ -107,7 +115,7 @@ try
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"      [WARNING] Tool 'GetCurrentWeather' error: {ex.Message}");
+        Console.WriteLine($"      [WARNING] Tool 'get_current_weather' error: {ex.Message}");
         Console.WriteLine($"       Agent melanjutkan tanpa hasil tool.");
         Console.WriteLine();
     }
@@ -116,7 +124,7 @@ try
     try
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
-        var toolName = "GetWeatherForecast";
+        var toolName = "get_weather_forecast";
         var parameters = new Dictionary<string, object?> { { "city", "Surabaya" }, { "days", 3 } };
 
         Console.WriteLine($"  [{timestamp}] Memanggil tool: {toolName}");
@@ -134,7 +142,7 @@ try
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"      [WARNING] Tool 'GetWeatherForecast' error: {ex.Message}");
+        Console.WriteLine($"      [WARNING] Tool 'get_weather_forecast' error: {ex.Message}");
         Console.WriteLine($"       Agent melanjutkan tanpa hasil tool.");
         Console.WriteLine();
     }
@@ -143,7 +151,7 @@ try
     try
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
-        var toolName = "ConvertTemperature";
+        var toolName = "convert_temperature";
         var parameters = new Dictionary<string, object?> { { "value", 100 }, { "fromUnit", "celsius" }, { "toUnit", "fahrenheit" } };
 
         Console.WriteLine($"  [{timestamp}] Memanggil tool: {toolName}");
@@ -161,7 +169,7 @@ try
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"      [WARNING] Tool 'ConvertTemperature' error: {ex.Message}");
+        Console.WriteLine($"      [WARNING] Tool 'convert_temperature' error: {ex.Message}");
         Console.WriteLine($"       Agent melanjutkan tanpa hasil tool.");
         Console.WriteLine();
     }
