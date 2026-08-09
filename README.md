@@ -9,7 +9,7 @@ Setiap module terdiri dari dua komponen utama:
 1. **Konten Teori (THEORY.md)** - Penjelasan komprehensif tentang konsep, arsitektur, mekanisme internal, use cases, dan trade-offs. Baca ini terlebih dahulu sebelum menulis kode.
 2. **Implementasi Praktis (Console App)** - Aplikasi .NET console yang berdiri sendiri (*self-contained*) sebagai demonstrasi praktis dari konsep yang dipelajari.
 
-Learning plan ini mencakup 9 module yang terorganisir dalam 4 skill level, mulai dari memahami dasar LLM hingga mengorkestrasi multi-agent workflows.
+Learning plan ini mencakup 10 module yang terorganisir dalam 4 skill level, mulai dari memahami dasar LLM hingga membangun MCP Server/Client dan mengorkestrasi multi-agent workflows.
 
 ---
 
@@ -47,6 +47,7 @@ Tabel berikut menunjukkan urutan module, estimasi waktu, dan dependency antar mo
 | 7 | 🟠 Advanced | 02-AgentsAsTools | 3–4 jam | Module 6 |
 | 8 | 🔴 Expert | 01-AgentToAgentCommunication | 4–5 jam | Module 7 |
 | 9 | 🔴 Expert | 02-Workflows | 4–5 jam | Module 8 |
+| 10 | 🔴 Expert | 03-McpSdk | 4–5 jam | Module 3, Module 8 |
 
 ### Alur Pembelajaran
 
@@ -81,7 +82,12 @@ Tabel berikut menunjukkan urutan module, estimasi waktu, dan dependency antar mo
 │  🔴 EXPERT▼                                        │                    │
 │  ┌────────────────────────────┐   ┌──────────────┐│                    │
 │  │ 01-AgentToAgentCommunication│──▶│ 02-Workflows ││                    │
-│  └────────────────────────────┘   └──────────────┘│                    │
+│  └────────────┬───────────────┘   └──────────────┘│                    │
+│               │                                    │                    │
+│               ▼                                    │                    │
+│  ┌──────────────────┐                              │                    │
+│  │ 03-McpSdk         │  (juga depends on Module 3) │                    │
+│  └──────────────────┘                              │                    │
 │                                                    │                    │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -188,7 +194,20 @@ AgentdotNet/
 │   └── 02-AgentsAsTools/
 ├── 04-Expert/
 │   ├── 01-AgentToAgentCommunication/
-│   └── 02-Workflows/
+│   ├── 02-Workflows/
+│   └── 03-McpSdk/
+│       ├── THEORY.md
+│       ├── README.md
+│       ├── McpSdk.Server/
+│       │   ├── McpSdk.Server.csproj
+│       │   ├── Program.cs
+│       │   ├── Models.cs
+│       │   └── Tools/WeatherTools.cs
+│       └── McpSdk.Client/
+│           ├── McpSdk.Client.csproj
+│           ├── Program.cs
+│           ├── InteractiveLoopHelpers.cs
+│           └── .env.example
 └── Tests/
     ├── Tests.csproj
     ├── TestInfra/

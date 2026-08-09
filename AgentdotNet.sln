@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31903.59
+# Visual Studio Version 18
+VisualStudioVersion = 18.7.11925.98
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "01-Beginner", "01-Beginner", "{A1B2C3D4-0001-0001-0001-000000000001}"
 EndProject
@@ -32,6 +32,24 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentToAgentCommunication", "04-Expert\01-AgentToAgentCommunication\AgentToAgentCommunication.csproj", "{D1E2F3A4-0001-0004-0001-000000000001}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Workflows", "04-Expert\02-Workflows\Workflows.csproj", "{1C4EA957-2B5F-4CF4-AE37-BD8891F1A12D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8C4073E1-2950-413E-8A92-F4A996D3231E}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		appsettings.json = appsettings.json
+		Directory.Build.props = Directory.Build.props
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "McpSdk", "McpSdk", "{A0362096-4F46-4E5D-BC91-328A8AE22D01}"
+	ProjectSection(SolutionItems) = preProject
+		04-Expert\03-McpSdk\README.md = 04-Expert\03-McpSdk\README.md
+		04-Expert\03-McpSdk\THEORY.md = 04-Expert\03-McpSdk\THEORY.md
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McpSdk.Server", "04-Expert\03-McpSdk\McpSdk.Server\McpSdk.Server.csproj", "{E0078B22-149A-9519-3FE1-B09082134991}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McpSdk.Client", "04-Expert\03-McpSdk\McpSdk.Client\McpSdk.Client.csproj", "{D234F3F4-EF02-E095-BF3C-D48AA05044D2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -163,6 +181,30 @@ Global
 		{1C4EA957-2B5F-4CF4-AE37-BD8891F1A12D}.Release|x64.Build.0 = Release|Any CPU
 		{1C4EA957-2B5F-4CF4-AE37-BD8891F1A12D}.Release|x86.ActiveCfg = Release|Any CPU
 		{1C4EA957-2B5F-4CF4-AE37-BD8891F1A12D}.Release|x86.Build.0 = Release|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Debug|x64.Build.0 = Debug|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Debug|x86.Build.0 = Debug|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Release|x64.ActiveCfg = Release|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Release|x64.Build.0 = Release|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Release|x86.ActiveCfg = Release|Any CPU
+		{E0078B22-149A-9519-3FE1-B09082134991}.Release|x86.Build.0 = Release|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Debug|x64.Build.0 = Debug|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Debug|x86.Build.0 = Debug|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Release|x64.ActiveCfg = Release|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Release|x64.Build.0 = Release|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Release|x86.ActiveCfg = Release|Any CPU
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -178,5 +220,8 @@ Global
 		{BC2A2922-84D6-4181-9A4C-AC473CF6363F} = {A1B2C3D4-0001-0001-0001-000000000003}
 		{D1E2F3A4-0001-0004-0001-000000000001} = {A1B2C3D4-0001-0001-0001-000000000004}
 		{1C4EA957-2B5F-4CF4-AE37-BD8891F1A12D} = {A1B2C3D4-0001-0001-0001-000000000004}
+		{A0362096-4F46-4E5D-BC91-328A8AE22D01} = {A1B2C3D4-0001-0001-0001-000000000004}
+		{E0078B22-149A-9519-3FE1-B09082134991} = {A0362096-4F46-4E5D-BC91-328A8AE22D01}
+		{D234F3F4-EF02-E095-BF3C-D48AA05044D2} = {A0362096-4F46-4E5D-BC91-328A8AE22D01}
 	EndGlobalSection
 EndGlobal
