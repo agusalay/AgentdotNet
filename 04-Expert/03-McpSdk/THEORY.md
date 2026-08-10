@@ -358,6 +358,388 @@ classDiagram
 
 ---
 
+## Capabilities Negotiation
+
+MCP menggunakan mekanisme *capability negotiation* saat connection setup. Proses ini memastikan bahwa client dan server saling memahami fitur apa saja yang masing-masing dukung, sehingga behavior dapat disesuaikan secara dinamis.
+
+### Mekanisme Negotiation
+
+Saat initialization handshake terjadi (`McpClient.CreateAsync()`), client dan server bertukar informasi capabilities yang didukung. Hal ini memungkinkan masing-masing pihak menyesuaikan behavior — misalnya client tidak akan mencoba subscribe ke resources jika server tidak mengiklankan capability tersebut.
+
+```mermaid
+sequenceDiagram
+    participant C as MCP Client
+    participant S as MCP Server
+
+    C->>S: initialize request<br/>(clientInfo, capabilities: {roots, sampling, elicitation})
+    S-->>C: initialize response<br/>(serverInfo, capabilities: {tools, resources, prompts, logging})
+    C->>S: initialized notification
+    Note over C,S: Kedua pihak sekarang tahu fitur apa yang didukung
+```
+
+### Client Capabilities
+
+| Capability | Deskripsi |
+|-----------|-----------|
+| **Roots** | Menyediakan filesystem root URIs ke server, memungkinkan server memahami workspace structure |
+| **Sampling** | Client dapat menangani LLM sampling requests dari server (server meminta client melakukan inference) |
+| **Elicitation** | Client dapat menampilkan forms atau URLs ke user atas permintaan server |
+
+### Server Capabilities
+
+| Capability | Deskripsi |
+|-----------|-----------|
+| **Tools** | Server menyediakan tools yang bisa dipanggil oleh client |
+| **Prompts** | Server menyediakan reusable prompt templates |
+| **Resources** | Server mengekspos read-only data (dengan opsi Subscribe untuk real-time updates) |
+| **Logging** | Server mendukung structured logging yang dikirim ke client |
+| **Completions** | Server mendukung argument auto-completion |
+
+### Automatic Capability Inference
+
+Server capabilities otomatis di-infer dari configured features. Misalnya, ketika developer memanggil `.WithTools<T>()` pada server builder, SDK secara otomatis mendeklarasikan tools capability saat initialization. Developer tidak perlu secara manual mengkonfigurasi capabilities — cukup daftarkan fitur yang diinginkan, dan SDK mengurus sisanya.
+
+### Protocol Version Negotiation
+
+Protocol version negotiation terjadi secara otomatis selama initialization. Jika client dan server tidak kompatibel dalam hal versi protokol, initialization akan gagal dengan error yang jelas. Hal ini mencegah situasi di mana kedua pihak berkomunikasi dengan asumsi berbeda tentang format pesan atau behavior.
+
+### Mengecek Server Capabilities dari Client
+
+Setelah connection established, client dapat memeriksa capabilities apa yang server dukung dan bertindak sesuai:
+
+```csharp
+// Cek apakah server mendukung tools sebelum memanggil ListToolsAsync
+if (client.ServerCapabilities.Tools is not null)
+{
+    var tools = await client.ListToolsAsync();
+}
+
+// Cek apakah server mendukung resource subscriptions
+if (client.ServerCapabilities.Resources is { Subscribe: true })
+{
+    await client.SubscribeToResourceAsync("config://app/settings");
+}
+```
+
+Pattern ini penting untuk membangun client yang robust — client dapat gracefully handle server dengan capabilities berbeda tanpa crash atau unexpected behavior.
+
+---
+
+## Transport Layer Detail
+
+Transport layer menentukan bagaimana JSON-RPC messages secara fisik dikirim antara client dan server. .NET MCP SDK v2 mendukung tiga transport utama, masing-masing dengan karakteristik dan use case yang berbeda.
+
+### Tiga Transport yang Didukung
+
+```mermaid
+graph LR
+    subgraph Transports["Transport Options"]
+        direction TB
+        A["stdio<br/>─────<br/>Local, child process<br/>stdin/stdout"]
+        B["Streamable HTTP<br/>─────<br/>Remote, recommended<br/>HTTP POST + SSE"]
+        C["SSE (Legacy)<br/>─────<br/>Remote, deprecated<br/>Unidirectional stream"]
+    end
+    
+    Client["MCP Client"] --> A
+    Client --> B
+    Client --> C
+```
+
+### Stdio Transport
+
+Komunikasi via stdin/stdout di mana server dijalankan sebagai child process oleh client. Ini adalah transport paling sederhana dan paling umum untuk tools lokal.
+
+**StdioClientTransportOptions:**
+
+| Option | Tipe | Deskripsi |
+|--------|------|-----------|
+| `Command` | `string` | Executable yang dijalankan (misal: `"dotnet"`) |
+| `Arguments` | `string[]` | Arguments untuk command |
+| `WorkingDirectory` | `string?` | Working directory untuk child process |
+| `ShutdownTimeout` | `TimeSpan` | Waktu tunggu sebelum force-kill saat shutdown |
+| `EnvironmentVariables` | `Dictionary<string, string>?` | Environment variables untuk child process |
+| `InheritEnvironmentVariables` | `bool` | Apakah inherit env vars dari parent process (default: true) |
+
+**⚠️ Security: Environment Variable Inheritance Risk**
+
+Secara default, semua environment variables dari parent process (host application) mengalir otomatis ke child process (MCP server). Ini berarti credentials seperti `AWS_SECRET_ACCESS_KEY`, `GITHUB_TOKEN`, `DATABASE_CONNECTION_STRING`, dan lainnya bisa tersedia untuk server yang mungkin bukan trusted code.
+
+```csharp
+// ❌ Risiko: Semua env vars termasuk secrets mengalir ke server
+var transport = new StdioClientTransport(new()
+{
+    Command = "dotnet",
+    Arguments = ["run", "--project", "../ThirdPartyServer/"],
+    InheritEnvironmentVariables = true  // default!
+});
+
+// ✅ Aman: Hanya env vars yang diperlukan saja yang diteruskan
+var transport = new StdioClientTransport(new()
+{
+    Command = "dotnet",
+    Arguments = ["run", "--project", "../ThirdPartyServer/"],
+    InheritEnvironmentVariables = false,
+    EnvironmentVariables = StdioClientTransport.GetDefaultEnvironmentVariables()
+});
+```
+
+Gunakan `GetDefaultEnvironmentVariables()` untuk mendapatkan curated safe set yang hanya berisi environment variables standar (seperti `PATH`, `HOME`, `TEMP`) tanpa credentials.
+
+### Streamable HTTP Transport (Recommended untuk Remote)
+
+Transport yang direkomendasikan untuk remote/production deployment. Client mengirim HTTP POST requests, dan server menahan response open sebagai SSE stream untuk mengirim hasil secara incremental.
+
+**Karakteristik utama:**
+
+- **Stateless mode** (default di v2): Setiap request independen, tidak ada session state di server. Ideal untuk horizontal scaling tanpa session affinity.
+- **Stateful mode**: Server mempertahankan session state, mendukung server-to-client requests (seperti sampling). Menggunakan `Mcp-Session-Id` header.
+- **Session resumption**: Dalam stateful mode, client dapat resume session setelah disconnect.
+- **Natural backpressure**: POST request ditahan sampai handler selesai — client secara alami menunggu dan tidak membanjiri server.
+- **Host name validation**: Penting untuk mencegah DNS rebinding attacks — selalu validasi Host header pada server.
+
+### SSE Transport (Legacy)
+
+Transport lama yang menggunakan unidirectional server-to-client streaming (Server-Sent Events) ditambah separate HTTP endpoint untuk client-to-server messages.
+
+**Karakteristik:**
+- Disabled by default di v2, harus di-enable secara eksplisit
+- Memerlukan stateful mode
+- **Tidak memiliki backpressure** — client bisa membanjiri server dengan requests karena sending dan receiving menggunakan channel terpisah
+- Dipertahankan hanya untuk backward compatibility dengan client/server v1
+
+### Transport Comparison Table
+
+| Aspek | stdio | Streamable HTTP (Stateless) | Streamable HTTP (Stateful) | SSE (Legacy) |
+|-------|-------|----------------------------|---------------------------|--------------|
+| Process model | Child process | Remote HTTP | Remote HTTP | Remote HTTP |
+| Direction | Bidirectional | Request-response | Bidirectional | Server→client stream |
+| Sessions | Implicit | None | Mcp-Session-Id | Session ID |
+| Server-to-client requests | ✓ | ✗ | ✓ | ✓ |
+| Backpressure | ✓ | ✓ | ✓ | ✗ |
+| Session resumption | N/A | N/A | ✓ | ✗ |
+| Horizontal scaling | N/A | No constraints | Session affinity | Session affinity |
+| Best for | Local tools, IDE | Remote production | Server-to-client features | Legacy compatibility |
+
+### In-Memory Transport (untuk Testing)
+
+SDK menyediakan `StreamServerTransport` dan `StreamClientTransport` yang berkomunikasi via `System.IO.Pipelines` tanpa network atau process boundary. Sangat berguna untuk integration testing di mana developer ingin test tool behavior tanpa overhead proses terpisah.
+
+```csharp
+// Contoh setup in-memory transport untuk unit testing
+var (serverTransport, clientTransport) = InMemoryTransport.CreatePair();
+// Gunakan serverTransport di test server, clientTransport di test client
+```
+
+---
+
+## Tools — Content Types dan Error Handling
+
+### Content Types yang Didukung oleh Tools
+
+MCP tools tidak hanya mengembalikan teks — SDK mendukung berbagai content type yang kaya untuk return values.
+
+| Content Type | Cara Return | Deskripsi |
+|-------------|-------------|-----------|
+| **Text** | Return `string` | Otomatis di-wrap menjadi `TextContentBlock` |
+| **Image** | Return `ImageContentBlock.FromBytes(bytes, "image/png")` | Binary image data dengan MIME type |
+| **Audio** | Return `AudioContentBlock.FromBytes(bytes, "audio/wav")` | Binary audio data dengan MIME type |
+| **Embedded Resources** | Return `EmbeddedResourceBlock` | Resource (text atau binary) yang di-embed dalam response |
+| **Mixed Content** | Return `IEnumerable<ContentBlock>` | Multiple blocks dalam satu response |
+| **Structured Content** | Set `UseStructuredContent = true` pada `[McpServerTool]` | Output mengikuti JSON Schema 2020-12 |
+
+```csharp
+[McpServerToolType]
+public static class ContentExamples
+{
+    // Text — cukup return string
+    [McpServerTool, Description("Mengembalikan text sederhana")]
+    public static string GetGreeting(string name) 
+        => $"Halo, {name}!";
+
+    // Image — return ImageContentBlock
+    [McpServerTool, Description("Generate chart image")]
+    public static ImageContentBlock GetChart()
+    {
+        byte[] chartBytes = GenerateChartPng();
+        return ImageContentBlock.FromBytes(chartBytes, "image/png");
+    }
+
+    // Mixed content — return multiple blocks
+    [McpServerTool, Description("Analisis dengan gambar dan teks")]
+    public static IEnumerable<ContentBlock> Analyze(string input)
+    {
+        yield return new TextContentBlock { Text = "Hasil analisis:" };
+        yield return ImageContentBlock.FromBytes(
+            GenerateVisualization(input), "image/png");
+        yield return new TextContentBlock { Text = "Kesimpulan: data valid." };
+    }
+}
+```
+
+### Content Annotations
+
+Setiap content block dapat dianotasi dengan metadata tambahan:
+
+- **Audience**: Menentukan siapa yang seharusnya melihat content — `Role.Assistant` (hanya untuk model) atau `Role.User` (ditampilkan ke pengguna)
+- **Priority**: Nilai `0.0` hingga `1.0` yang mengindikasikan seberapa penting content tersebut (1.0 = paling penting)
+
+### Error Handling di Tools
+
+Pemahaman tentang error handling dalam MCP sangat penting karena terdapat perbedaan fundamental antara *tool errors* dan *protocol errors*.
+
+```mermaid
+graph TD
+    E[Exception di Tool] --> Check{Tipe Exception?}
+    Check -->|McpException| ME[Message dikirim ke client<br/>IsError = true]
+    Check -->|Non-McpException| NE["Generic message:<br/>'An error occurred invoking {tool}'<br/>IsError = true"]
+    Check -->|McpProtocolException| PE[Re-throw sebagai<br/>JSON-RPC error response]
+    Check -->|OperationCanceledException| OC[Re-throw jika<br/>cancellation token triggered]
+    
+    ME --> LLM[LLM dapat lihat error<br/>dan recover/retry]
+    NE --> LLM
+    PE --> Proto[Protocol-level error<br/>bukan tool result]
+```
+
+**Tool Errors vs Protocol Errors:**
+
+| Aspek | Tool Error | Protocol Error |
+|-------|-----------|----------------|
+| **Penyebab** | Logic error dalam tool (invalid input, service unavailable) | Masalah protokol (method tidak ditemukan, invalid JSON-RPC) |
+| **Representasi** | `CallToolResult` dengan `IsError = true` | JSON-RPC error response |
+| **Visibility ke LLM** | ✓ LLM melihat error message, bisa decide next action | ✗ Biasanya menyebabkan exception di client |
+| **Recovery** | LLM bisa retry dengan arguments berbeda | Client perlu handle di application level |
+
+**Detail exception handling:**
+
+- **McpException**: Message-nya langsung dikirim ke client sebagai tool error. Gunakan ini untuk error yang informatif bagi LLM.
+- **Non-McpException**: Untuk security, hanya generic message `"An error occurred invoking '{toolName}'"` yang dikirim. Stack trace dan detail internal TIDAK dikirim ke client.
+- **McpProtocolException**: Di-rethrow sebagai JSON-RPC error response — ini bukan tool error, melainkan indikasi masalah protokol.
+- **OperationCanceledException**: Di-rethrow jika cancellation token sudah triggered (request dibatalkan).
+
+**Client-side error checking:**
+
+```csharp
+var result = await client.CallToolAsync("ProcessData", args);
+
+if (result.IsError is true)
+{
+    // Tool mengalami error — LLM bisa lihat pesan ini dan decide action
+    Console.WriteLine($"Tool error: {result.Content[0].Text}");
+}
+```
+
+### Tool List Change Notifications
+
+Server dapat secara dinamis menambah atau menghapus tools saat runtime, kemudian mengirim notification ke connected clients agar mereka refresh daftar tools. Ini memungkinkan sistem yang adaptif di mana available tools berubah berdasarkan kondisi (misalnya: tools tertentu hanya tersedia setelah authentication).
+
+### JSON Schema Generation
+
+Parameter types dari C# method secara otomatis di-map ke JSON Schema types:
+
+| C# Type | JSON Schema Type |
+|---------|-----------------|
+| `string` | `string` |
+| `int`, `long` | `integer` |
+| `float`, `double`, `decimal` | `number` |
+| `bool` | `boolean` |
+| Complex types (class/record) | `object` (dengan nested properties) |
+| `string[]`, `List<T>` | `array` |
+| Nullable types (`T?`) | Type tanpa `required` constraint |
+
+### MCP Header (v2 Feature)
+
+Parameter tool dapat di-mirror sebagai HTTP headers menggunakan `[McpHeader]` attribute. Ini berguna untuk routing dan middleware processing tanpa perlu parse tool arguments:
+
+```csharp
+[McpServerTool, Description("Query data by region")]
+public static string QueryData(
+    [McpHeader("Region"), Description("Target region")] string region,
+    [Description("Query string")] string query)
+{
+    // 'region' juga dikirim sebagai HTTP header "Region: {value}"
+    // Berguna untuk load balancer routing berdasarkan region
+    return ExecuteQuery(region, query);
+}
+```
+
+---
+
+## Resources dan Prompts
+
+### Resources
+
+MCP Server dapat mengekspos *resources* — read-only data yang bisa dibaca oleh client. Resources merepresentasikan berbagai jenis data: files, database records, API responses, atau live system data.
+
+#### Jenis Resources
+
+| Jenis | Deskripsi | Contoh URI |
+|-------|-----------|-----------|
+| **Direct Resources** | URI fixed, langsung muncul di `ListResources` | `config://app/settings` |
+| **Template Resources** | URI template (RFC 6570) dengan parameter | `users://{userId}/profile` |
+
+#### Attribute-Based Resource Definition
+
+```csharp
+[McpServerResourceType]
+public static class AppResources
+{
+    // Direct resource — URI fixed
+    [McpServerResource(Uri = "config://app/settings")]
+    [Description("Application configuration settings")]
+    public static string GetSettings()
+    {
+        return JsonSerializer.Serialize(LoadAppSettings());
+    }
+
+    // Template resource — URI dengan parameter
+    [McpServerResource(UriTemplate = "users://{userId}/profile")]
+    [Description("User profile by ID")]
+    public static string GetUserProfile(string userId)
+    {
+        var profile = LoadUserProfile(userId);
+        return JsonSerializer.Serialize(profile);
+    }
+}
+```
+
+#### Client-Side Resource Access
+
+```csharp
+// List semua direct resources
+var resources = await client.ListResourcesAsync();
+
+// List resource templates
+var templates = await client.ListResourceTemplatesAsync();
+
+// Baca resource tertentu
+var content = await client.ReadResourceAsync("config://app/settings");
+
+// Subscribe ke resource updates (jika server mendukung)
+if (client.ServerCapabilities.Resources is { Subscribe: true })
+{
+    await client.SubscribeToResourceAsync("config://app/settings");
+    // Client akan menerima notification saat resource berubah
+}
+```
+
+#### Resource Subscriptions
+
+Client dapat subscribe ke resource updates — server mengirim notification setiap kali content resource berubah. Ini memungkinkan reactive patterns di mana client selalu memiliki data terbaru tanpa polling.
+
+### Prompts
+
+MCP Server dapat mengekspos *prompts* — reusable prompt templates yang menyediakan structured interaction patterns. Prompts memungkinkan server menawarkan cara terstandarisasi untuk berinteraksi dengan capabilities-nya.
+
+**Catatan**: Fitur prompts belum diimplementasikan dalam module ini, tetapi penting untuk dipahami sebagai bagian dari MCP capabilities. Prompts memungkinkan server menyediakan:
+- Pre-configured interaction templates
+- Multi-step workflows
+- Domain-specific conversation starters
+- Parameterized prompt generation
+
+> **Konten dalam section "Capabilities Negotiation", "Transport Layer Detail", "Tools — Content Types dan Error Handling", dan "Resources dan Prompts" dirangkum dan diparafrase dari [dokumentasi resmi .NET MCP SDK v2](https://csharp.sdk.modelcontextprotocol.io/v2/concepts/index.html).**
+
+---
+
 ## McpClientTool → AIFunction Inheritance
 
 Salah satu design decision paling elegant dalam .NET MCP SDK adalah bahwa `McpClientTool` mewarisi langsung dari `AIFunction`. Ini bukan kebetulan - ini adalah *intentional design pattern* yang memungkinkan MCP tools seamlessly terintegrasi dengan seluruh ekosistem Microsoft.Extensions.AI.
@@ -705,7 +1087,10 @@ Penguasaan MCP memberikan learner kemampuan untuk:
 
 ## Bacaan Lanjutan
 
-- [.NET MCP SDK Documentation (v2)](https://csharp.sdk.modelcontextprotocol.io/v2/) - Dokumentasi resmi .NET MCP SDK yang mencakup getting started, API reference, dan contoh implementasi server dan client menggunakan `ModelContextProtocol` NuGet package.
+- [.NET MCP SDK Documentation (v2) — Concepts](https://csharp.sdk.modelcontextprotocol.io/v2/concepts/index.html) - Dokumentasi resmi .NET MCP SDK yang mencakup getting started, API reference, dan contoh implementasi server dan client menggunakan `ModelContextProtocol` NuGet package.
+- [.NET MCP SDK v2 — Tools](https://csharp.sdk.modelcontextprotocol.io/v2/concepts/tools/tools.html) - Dokumentasi lengkap tentang tool definition, content types, error handling, dan advanced tool features.
+- [.NET MCP SDK v2 — Transports](https://csharp.sdk.modelcontextprotocol.io/v2/concepts/transports/transports.html) - Detail tentang transport mechanisms (stdio, Streamable HTTP, SSE) termasuk configuration options dan security considerations.
+- [Announcing v2.0 of the official MCP C# SDK](https://devblogs.microsoft.com/dotnet/announcing-v20-of-the-official-mcp-csharp-sdk/) - Blog post resmi Microsoft yang mengumumkan v2 SDK dengan fitur-fitur baru seperti Streamable HTTP, structured content, dan MCP headers.
 - [Model Context Protocol Specification](https://modelcontextprotocol.io) - Spesifikasi resmi MCP yang mendefinisikan protocol, transport mechanisms, message formats, dan capabilities negotiation. Referensi utama untuk memahami protocol secara mendalam.
 - [Microsoft Agent Framework - Adding Tools (Module 3)](https://learn.microsoft.com/en-us/dotnet/ai/conceptual/agents) - Dokumentasi Microsoft tentang konsep agents dan tools dalam ekosistem .NET AI, termasuk `IChatClient`, `AIFunction`, dan function invocation patterns yang menjadi fondasi integrasi MCP.
 - [MCP GitHub Repository](https://github.com/modelcontextprotocol) - Source code, specification drafts, dan community discussions seputar Model Context Protocol. Termasuk reference implementations dalam berbagai bahasa.
