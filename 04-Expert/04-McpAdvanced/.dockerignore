@@ -1,0 +1,41 @@
+# =============================================================================
+# .dockerignore untuk McpAdvanced
+# Mengecualikan file yang tidak diperlukan dalam Docker build context
+# untuk mempercepat build dan mengurangi ukuran context yang dikirim ke daemon.
+# =============================================================================
+
+# Build output directories — akan di-rebuild di dalam container
+**/bin/
+**/obj/
+
+# IDE dan editor files
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+**/*.suo
+
+# Git files
+.git
+.gitignore
+
+# Documentation files — tidak diperlukan untuk runtime
+README.md
+THEORY.md
+
+# Client project — tidak diperlukan untuk server image
+McpAdvanced.Client/
+
+# Environment files yang mungkin berisi secrets
+**/.env
+**/.env.local
+**/.env.example
+
+# Temporary dan log files
+**/logs/
+**/*.log
+**/tmp/
+
+# Docker files sendiri (mencegah recursive copy)
+Dockerfile
+.dockerignore
